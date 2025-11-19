@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Devbay Chatbot</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  
+  <!-- Floating Chatbot Button -->
+  <div id="chatbot-btn">💬</div>
+
+  <!-- Chatbot Widget -->
+  <div id="chatbot-widget" class="hidden">
+    <div id="chat-header">
+      <span>Devbay AI Assistant</span>
+      <button id="close-chat">×</button>
+    </div>
+
+    <div id="chat-body"></div>
+
+    <div id="suggest-box">
+      <button class="suggest">What is Devbay?</button>
+      <button class="suggest">What services do you offer?</button>
+      <button class="suggest">How can I contact Devbay?</button>
+    </div>
+
+    <div id="chat-input-area">
+      <input id="chat-input" type="text" placeholder="Type a message..." />
+      <button id="send-btn">➤</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
