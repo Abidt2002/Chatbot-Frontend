@@ -1,4 +1,4 @@
-// script.js — Embedding-based Chat Widget Frontend
+// script.js — Production-ready Embedding-based Chat Widget
 const chatBtn = document.getElementById("chatbot-btn");
 const widget = document.getElementById("chatbot-widget");
 const closeBtn = document.getElementById("close-chat");
@@ -10,13 +10,12 @@ const suggests = document.querySelectorAll(".suggest");
 // LOGO URL (optional)
 const LOGO_URL = "/mnt/data/0a3d0d7c-23dd-4aa1-8f6c-975dda3c03fe.png";
 
-// FRONTEND TOKEN placeholder
-const FRONTEND_GH_TOKEN = "__FRONTEND_GH_TOKEN__";
+- name: Inject frontend token
+  run: sed -i "s/__FRONTEND_GH_TOKEN__/${{ secrets.CHATBOT_FRONTEND_TOKEN }}/g" path/to/script.js
 
-// Open widget
+
+// Open / Close widget
 chatBtn.onclick = () => widget.classList.remove("hidden");
-
-// Close widget
 closeBtn.onclick = () => widget.classList.add("hidden");
 
 // Typing animation
@@ -50,47 +49,52 @@ async function ask(question) {
   chatBody.scrollTop = chatBody.scrollHeight;
 
   // Trigger workflow dispatch
-  const dispatchUrl = "https://api.github.com/repos/Abidt2002/Chatbot-Backend/actions/workflows/chatbot.yml/dispatches";
   try {
-    await fetch(dispatchUrl, {
-      method: "POST",
-      headers: {
-        "Accept": "application/vnd.github.v3+json",
-        "Authorization": `Bearer ${FRONTEND_GH_TOKEN}`
-      },
-      body: JSON.stringify({ ref: "main", inputs: { question } })
-    });
+    const dispatchRes = await fetch(
+      "https://api.github.com/repos/Abidt2002/Chatbot-Backend/actions/workflows/chatbot.yml/dispatches",
+      {
+        method: "POST",
+        headers: {
+          "Accept": "application/vnd.github.v3+json",
+          "Authorization": `Bearer ${FRONTEND_GH_TOKEN}`,
+        },
+        body: JSON.stringify({ ref: "main", inputs: { question } }),
+      }
+    );
+
+    if (!dispatchRes.ok) throw new Error("Workflow dispatch failed");
+
   } catch (e) {
     console.error("Dispatch error:", e);
     typeMessage("⚠️ Failed to trigger backend. Please try again later.");
     return;
   }
 
-  // Show temporary typing bubble
   typeMessage("Thinking...");
 
-  // Poll workflow runs for latest output
-  const runsUrl = "https://api.github.com/repos/Abidt2002/Chatbot-Backend/actions/runs";
-  let answer = null;
+  // Poll workflow runs until we get the correct output
   const maxPolls = 15;
   const pollDelayMs = 5000;
+  let answer = null;
 
   for (let i = 0; i < maxPolls; i++) {
     await sleep(pollDelayMs);
 
     try {
-      const runsRes = await fetch(runsUrl, { headers: { "Accept": "application/vnd.github.v3+json" } });
+      const runsRes = await fetch(
+        "https://api.github.com/repos/Abidt2002/Chatbot-Backend/actions/runs",
+        { headers: { "Accept": "application/vnd.github.v3+json" } }
+      );
       const runsJson = await runsRes.json();
-      const latestRun = runsJson.workflow_runs?.[0];
+      // Pick the latest run created within last 2 minutes
+      const latestRun = runsJson.workflow_runs?.find(
+        run => new Date() - new Date(run.created_at) < 2 * 60 * 1000
+      );
       if (!latestRun) continue;
 
-      // Only consider recent runs (<5 min)
-      const runAgeMs = Date.now() - new Date(latestRun.created_at).getTime();
-      if (runAgeMs > 5 * 60 * 1000) continue;
-
       // Fetch unique output file
-      const rawOutputUrl = `https://raw.githubusercontent.com/Abidt2002/Chatbot-Backend/main/chatbot_output_${latestRun.id}.txt?timestamp=${Date.now()}`;
-      const rawRes = await fetch(rawOutputUrl);
+      const rawUrl = `https://raw.githubusercontent.com/Abidt2002/Chatbot-Backend/main/chatbot_output_${latestRun.id}.txt?timestamp=${Date.now()}`;
+      const rawRes = await fetch(rawUrl);
 
       if (rawRes.ok) {
         const text = await rawRes.text();
@@ -124,4 +128,5 @@ sendBtn.onclick = () => {
 
 // Quick suggestion buttons
 suggests.forEach(btn => btn.onclick = () => ask(btn.textContent));
+
 
