@@ -1,4 +1,4 @@
-// script.js — Multi-user safe Chat Widget Version
+// script.js — Embedding-based Chat Widget Frontend
 const chatBtn = document.getElementById("chatbot-btn");
 const widget = document.getElementById("chatbot-widget");
 const closeBtn = document.getElementById("close-chat");
@@ -7,7 +7,7 @@ const chatBody = document.getElementById("chat-body");
 const input = document.getElementById("chat-input");
 const suggests = document.querySelectorAll(".suggest");
 
-// LOGO URL (path you uploaded)
+// LOGO URL (optional)
 const LOGO_URL = "/mnt/data/0a3d0d7c-23dd-4aa1-8f6c-975dda3c03fe.png";
 
 // FRONTEND TOKEN placeholder
@@ -19,7 +19,7 @@ chatBtn.onclick = () => widget.classList.remove("hidden");
 // Close widget
 closeBtn.onclick = () => widget.classList.add("hidden");
 
-// Typing animation (simulated)
+// Typing animation
 function typeMessage(text) {
   const box = document.createElement("div");
   box.className = "bot-msg";
@@ -35,25 +35,13 @@ function typeMessage(text) {
   }, 20);
 }
 
-// Send message
-sendBtn.onclick = () => {
-  const q = input.value.trim();
-  if (q) {
-    ask(q);
-    input.value = "";
-  }
-};
-
-// Quick suggestion buttons
-suggests.forEach(btn => btn.onclick = () => ask(btn.textContent));
-
-// Helper: sleep
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 // Escape HTML
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
+
+// Sleep helper
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Ask backend via GitHub Actions
 async function ask(question) {
@@ -61,7 +49,7 @@ async function ask(question) {
   chatBody.innerHTML += `<div class="user-msg">${escapeHtml(question)}</div>`;
   chatBody.scrollTop = chatBody.scrollHeight;
 
-  // Trigger workflow
+  // Trigger workflow dispatch
   const dispatchUrl = "https://api.github.com/repos/Abidt2002/Chatbot-Backend/actions/workflows/chatbot.yml/dispatches";
   try {
     await fetch(dispatchUrl, {
@@ -78,12 +66,13 @@ async function ask(question) {
     return;
   }
 
+  // Show temporary typing bubble
   typeMessage("Thinking...");
 
-  // Poll workflow runs to get latest output
+  // Poll workflow runs for latest output
   const runsUrl = "https://api.github.com/repos/Abidt2002/Chatbot-Backend/actions/runs";
   let answer = null;
-  const maxPolls = 15;        // ~75s max
+  const maxPolls = 15;
   const pollDelayMs = 5000;
 
   for (let i = 0; i < maxPolls; i++) {
@@ -92,14 +81,15 @@ async function ask(question) {
     try {
       const runsRes = await fetch(runsUrl, { headers: { "Accept": "application/vnd.github.v3+json" } });
       const runsJson = await runsRes.json();
-      const latest = runsJson.workflow_runs?.[0];
-      if (!latest) continue;
+      const latestRun = runsJson.workflow_runs?.[0];
+      if (!latestRun) continue;
 
-      const runAgeMs = Date.now() - new Date(latest.created_at).getTime();
+      // Only consider recent runs (<5 min)
+      const runAgeMs = Date.now() - new Date(latestRun.created_at).getTime();
       if (runAgeMs > 5 * 60 * 1000) continue;
 
-      // Build URL to unique output file
-      const rawOutputUrl = `https://raw.githubusercontent.com/Abidt2002/Chatbot-Backend/main/chatbot_output_${latest.id}.txt?timestamp=${Date.now()}`;
+      // Fetch unique output file
+      const rawOutputUrl = `https://raw.githubusercontent.com/Abidt2002/Chatbot-Backend/main/chatbot_output_${latestRun.id}.txt?timestamp=${Date.now()}`;
       const rawRes = await fetch(rawOutputUrl);
 
       if (rawRes.ok) {
@@ -118,7 +108,20 @@ async function ask(question) {
     chatBody.innerHTML += `<div class="bot-msg">${escapeHtml(answer)}</div>`;
     chatBody.scrollTop = chatBody.scrollHeight;
   } else {
-    chatBody.innerHTML += `<div class="bot-msg">⚠️ No response yet. Please try again in a moment.</div>`;
+    chatBody.innerHTML += `<div class="bot-msg">⚠️ No response yet. Please try again shortly.</div>`;
     chatBody.scrollTop = chatBody.scrollHeight;
   }
 }
+
+// Send message
+sendBtn.onclick = () => {
+  const q = input.value.trim();
+  if (q) {
+    ask(q);
+    input.value = "";
+  }
+};
+
+// Quick suggestion buttons
+suggests.forEach(btn => btn.onclick = () => ask(btn.textContent));
+
